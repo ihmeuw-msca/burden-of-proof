@@ -1,0 +1,43 @@
+# {% set data = load_setup_py_data()   %}
+# {% set name = data.get('name')       %}
+# {% set version = data.get('version') %}
+# above dynamic loading did not work, so using hard coded values
+{% set name = 'limetr'   %}
+{% set version = '0.0.2' %}
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  path: .
+
+build:
+  # build steps are in build.sh
+  # script: python check_requirements.py setup.py install
+
+requirements:
+  host:
+    - pip
+    - python
+    - wheel
+
+  run:
+    - pip
+    - python
+    - numpy
+
+test:
+  # test steps are in run_test.sh
+  # script: python tests/check_utils.py tests/check_limetr.py
+
+about:
+  description: linear mixed effects model with trimming
+  dev_url: https://github.com/zhengp0/limetr/
+  doc_url: https://github.com/zhengp0/limetr/
+  home: https://github.com/zhengp0/limetr/
+  license: BSD 2-Clause License
+  license_family: BSD
+  summary: Linear Mixed Effects Model with Trimming
+    To copy file from build/lib.linux-x86_64-3.7/limetr/special_mat.cpython-37m-x86_64-linux-gnu.so
+

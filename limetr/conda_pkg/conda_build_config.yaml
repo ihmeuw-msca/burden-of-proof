@@ -1,0 +1,12 @@
+# - are replaced by _ to allow conda build to parse.
+
+numpy:
+  - 1.19.1
+scipy:
+  - 1.5.2
+cyipopt:
+
+# cyipopt:
+#   - 0.2.0  
+# scikit_sparse:
+#  - 0.4.4
