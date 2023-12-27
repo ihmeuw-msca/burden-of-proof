@@ -1,6 +1,8 @@
 ## HEADER #################################################################
+# Date: 5/3/2022
 # Purpose: Formatting for MR-BRT
 #          
+# source("filepath", echo=T)
 
 ## SET-UP #################################################################
 # Clear memory
@@ -26,7 +28,7 @@ cause_ids <- c("neo_esophageal" = 411, "neo_mouth" = 444, "neo_larynx" = 423, "n
                "cvd_stroke" = 494, "cvd_ihd" = 493)
 
 data_fp <- paste0("filepath")
-cleaned_data_file <- c("ihd_filename.csv", "stroke_filename.csv", "hnc_filename.csv")
+cleaned_data_file <- c("prepped_data/prepped_IHD.csv", "prepped_data/prepped_Stroke.csv", "prepped_data/prepped_HNC.csv")
 
 ## SCRIPT ##################################################################
 data <- data.table()
@@ -80,6 +82,7 @@ total_nids <- length(unique(data$NID))
 data <- data[`Exposure temporality` != "Former" & `Temporality of unexposed group` != "Former"]
 print(paste0("Dropping the former chewing effect sizes dropped ", total_rows - nrow(data), " rows of data and ", total_nids - length(unique(data$NID)), " NIDs."))
 
+## For testing purposes, I am going to select the alternative definition where we use both-sexes data when available
 # check that all rows have been reviewed
 if(nrow(data[is.na(to_use_alt) | to_use_alt == ""]) != 0){
   stop("There is a problem where some rows of data have not been reviewed and selected for use!")
@@ -113,10 +116,6 @@ modeling_data[se_calc == "uses confidence interval", ln_rr_se := (log(`Upper CI`
 imputed_se <- quantile(modeling_data$ln_rr_se, .98, na.rm = T)
 modeling_data[se_calc == "uses 98th percentile of observed standard errors", ln_rr_se := imputed_se]
 
-# Applying downweighting
-modeling_data[!is.na(overlapping), observation_count := .N, by = c("acause", "study_id", "overlapping")]
-modeling_data[!is.na(overlapping), ln_rr_se := sqrt(observation_count)*ln_rr_se]
-
 # Clean up sample size
 modeling_data[`Study design` %like% "ase-", `:=` (`Total cases` = ifelse(is.na(`Total cases`), `Exposed cases`+`Unexposed cases`, `Total cases`), 
                                                   `Total controls` = ifelse(is.na(`Total controls`), `Exposed controls`+`Unexposed controls`, `Total controls`))]
@@ -132,11 +131,11 @@ if(F){ # Testing location-specific models
     dplyr::select(`Location 1 IHME Location ID`, seq, se_calc, rei_id, bundle_id, bundle_version_id, risk_type, cause_id, study_id, ln_rr, ln_rr_se, bc_loc_representative, bc_representative, bc_exposure_study, bc_outcome_selfreport, bc_adj_L0, bc_adj_L1, bc_adj_L2, 
                   bc_subpopulation, bc_exp_temporality, bc_exp_definition, bc_aggregate_outcome, `Total cases`, `Total controls`,`Exposed cases`, `Unexposed cases`, `Exposed controls`, `Unexposed controls`,
                   acause, study_design, age_start, age_end, age_mean, age_sd, risk_def, smoking_status, percent_male, outcome_def, exp_temp, unexp_temp, study_label, sample_size, exp_definition_free,
-                  cv_age, cv_sex, cv_income, cv_smoking, cv_alcohol, cv_religion, cv_geography, cv_other, cv_other_smokeless_tob, cv_occupation, cv_oral_hygiene, cv_race, cv_time, cv_urban, cv_nontob_chewing, cv_diet, cv_genotype, cv_ses, cv_medical_history, cv_language, cv_shs)
+                  cv_age, cv_sex, cv_income, cv_smoking, cv_alcohol, cv_religion, cv_geography, cv_other, cv_other_smokeless_tob, cv_occupation, cv_oral_hygiene, cv_race, cv_time, cv_urban, cv_nontob_chewing, cv_diet, cv_genotype, cv_ses, cv_medical_history, cv_language, cv_shs, overlapping)
   setnames(modeling_data, "Location 1 IHME Location ID", "ihme_loc_id")
   modeling_data[, country_id := str_sub(ihme_loc_id, start = 1L, end = 3L)]
   
-  source("filepath")
+  source("/ihme/cc_resources/libraries/current/r/get_location_metadata.R")
   locs <- get_location_metadata(35, release_id = 9)
   modeling_data <- merge(modeling_data, locs[, .(ihme_loc_id, region_name)], by.x = "country_id", by.y = "ihme_loc_id")
   
@@ -147,7 +146,7 @@ if(F){ # Testing location-specific models
     dplyr::select(seq, se_calc, rei_id, bundle_id, bundle_version_id, risk_type, cause_id, study_id, ln_rr, ln_rr_se, bc_loc_representative, bc_representative, bc_exposure_study, bc_outcome_selfreport, bc_adj_L0, bc_adj_L1, bc_adj_L2, 
                   bc_subpopulation, bc_exp_temporality, bc_exp_definition, bc_aggregate_outcome, `Total cases`, `Total controls`,`Exposed cases`, `Unexposed cases`, `Exposed controls`, `Unexposed controls`,
                   acause, study_design, age_start, age_end, age_mean, age_sd, risk_def, smoking_status, percent_male, outcome_def, exp_temp, unexp_temp, study_label, sample_size, exp_definition_free,
-                  cv_age, cv_sex, cv_income, cv_smoking, cv_alcohol, cv_religion, cv_geography, cv_other, cv_other_smokeless_tob, cv_occupation, cv_oral_hygiene, cv_race, cv_time, cv_urban, cv_nontob_chewing, cv_diet, cv_genotype, cv_ses, cv_medical_history, cv_language, cv_shs, reasoning_alt, overlapping)
+                  cv_age, cv_sex, cv_income, cv_smoking, cv_alcohol, cv_religion, cv_geography, cv_other, cv_other_smokeless_tob, cv_occupation, cv_oral_hygiene, cv_race, cv_time, cv_urban, cv_nontob_chewing, cv_diet, cv_genotype, cv_ses, cv_medical_history, cv_language, cv_shs, overlapping)
 }
 
 #Sensitivity tests
@@ -175,14 +174,22 @@ if(F){ # No covariates
   modeling_data <- modeling_data %>%
     dplyr::select(seq, se_calc, rei_id, bundle_id, bundle_version_id, risk_type, cause_id, study_id, ln_rr, ln_rr_se, `Total cases`, `Total controls`,`Exposed cases`, `Unexposed cases`, `Exposed controls`, `Unexposed controls`,
                   acause, study_design, age_start, age_end, age_mean, age_sd, risk_def, smoking_status, percent_male, outcome_def, exp_temp, unexp_temp, study_label, sample_size, exp_definition_free,
-                  cv_age, cv_sex, cv_income, cv_smoking, cv_alcohol, cv_religion, cv_geography, cv_other, cv_other_smokeless_tob, cv_occupation, cv_oral_hygiene, cv_race, cv_time, cv_urban, cv_nontob_chewing, cv_diet, cv_genotype, cv_ses, cv_medical_history, cv_language, cv_shs)
+                  cv_age, cv_sex, cv_income, cv_smoking, cv_alcohol, cv_religion, cv_geography, cv_other, cv_other_smokeless_tob, cv_occupation, cv_oral_hygiene, cv_race, cv_time, cv_urban, cv_nontob_chewing, cv_diet, cv_genotype, cv_ses, cv_medical_history, cv_language, cv_shs, overlapping)
 }
 
 if(F){ # Only non-smokers
   modeling_data <- modeling_data[smoking_status == "Never smokers" | smoking_status == "Non-smokers"]
 }
 
-# Renaming bias covariates
+# Applying downweighting - testing with and without
+modeling_data[!is.na(overlapping) & overlapping != "", observation_count := .N, by = c("acause", "study_id", "overlapping", "percent_male")]
+if(T){
+  print("Applying downweights")
+  modeling_data[!is.na(overlapping) & overlapping != "", ln_rr_se := sqrt(observation_count)*ln_rr_se]
+  modeling_data$overlapping <- NULL
+}
+
+# Renaming bias covariates for new pipeline
 col_names <- colnames(modeling_data)[colnames(modeling_data) %like% "bc_"]
 new_col_names <- str_replace(col_names, "^bc_", "cov_")
 setnames(modeling_data, col_names, new_col_names)
@@ -196,7 +203,7 @@ for(i in unique(modelset$acause)){
   relevant_cols <- names(colSums(subset[, ..all_cvs])[which(colSums(subset[, ..all_cvs]) <= 1 | colSums(subset[, ..all_cvs]) >= nrow(subset) - 1)])
   subset <- subset %>% select(!all_of(relevant_cols))
 
-  fwrite(subset, paste0(data_fp, "filename-", i, ".csv"))
+  fwrite(subset, paste0(data_fp, "smoking_smokeless-", i, ".csv"))
 }
 
 if(F){ # Sex-specific models
@@ -227,8 +234,8 @@ if(F){ # Sex-specific models
   modelset[se_calc == "uses 98th percentile of observed standard errors", ln_rr_se := imputed_se]
   
   # Applying downweighting
-  modelset[!is.na(overlapping), observation_count := .N, by = c("acause", "study_id", "overlapping")]
-  modelset[!is.na(overlapping), ln_rr_se := sqrt(observation_count)*ln_rr_se]
+  modelset[!is.na(overlapping) & overlapping != "", observation_count := .N, by = c("acause", "study_id", "overlapping", "Percentage male")]
+  modelset[!is.na(overlapping) & overlapping != "", ln_rr_se := sqrt(observation_count)*ln_rr_se]
   
   # Clean up sample size
   modelset[`Study design` %like% "ase-", `:=` (`Total cases` = ifelse(is.na(`Total cases`), `Exposed cases`+`Unexposed cases`, `Total cases`), 
@@ -240,7 +247,7 @@ if(F){ # Sex-specific models
   setnames(modelset, c("Study design", "Age start", "Age end", "Age mean", "Age SD", "Effect risk mapping", "Smoking status", "Percentage male", "Outcome definition", "Exposure temporality", "Temporality of unexposed group", "Study ID", "Exposed group definition"), 
            c("study_design", "age_start", "age_end", "age_mean", "age_sd", "risk_def", "smoking_status", "percent_male", "outcome_def", "exp_temp", "unexp_temp", "study_label", "exp_definition_free"))
   
-  # Renaming bias covariates
+  # Renaming bias covariates for new pipeline
   col_names <- colnames(modelset)[colnames(modelset) %like% "bc_"]
   new_col_names <- str_replace(col_names, "^bc_", "cov_")
   setnames(modelset, col_names, new_col_names)
@@ -252,12 +259,12 @@ if(F){ # Sex-specific models
     dplyr::select(seq, se_calc, rei_id, bundle_id, bundle_version_id, risk_type, cause_id, study_id, ln_rr, ln_rr_se, cov_loc_representative, cov_representative, cov_exposure_study, cov_outcome_selfreport, cov_adj_L0, cov_adj_L1, cov_adj_L2, 
                   cov_subpopulation, cov_exp_temporality, cov_exp_definition, cov_aggregate_outcome, `Total cases`, `Total controls`,`Exposed cases`, `Unexposed cases`, `Exposed controls`, `Unexposed controls`,
                   acause, study_design, age_start, age_end, age_mean, age_sd, risk_def, smoking_status, percent_male, outcome_def, exp_temp, unexp_temp, study_label, sample_size, exp_definition_free,
-                  cv_age, cv_sex, cv_income, cv_smoking, cv_alcohol, cv_religion, cv_geography, cv_other, cv_other_smokeless_tob, cv_occupation, cv_oral_hygiene, cv_race, cv_time, cv_urban, cv_nontob_chewing, cv_diet, cv_genotype, cv_ses, cv_medical_history, cv_language, cv_shs)
+                  cv_age, cv_sex, cv_income, cv_smoking, cv_alcohol, cv_religion, cv_geography, cv_other, cv_other_smokeless_tob, cv_occupation, cv_oral_hygiene, cv_race, cv_time, cv_urban, cv_nontob_chewing, cv_diet, cv_genotype, cv_ses, cv_medical_history, cv_language, cv_shs, observation_count)
   male_modelset <- male_modelset %>%
     dplyr::select(seq, se_calc, rei_id, bundle_id, bundle_version_id, risk_type, cause_id, study_id, ln_rr, ln_rr_se, cov_loc_representative, cov_representative, cov_exposure_study, cov_outcome_selfreport, cov_adj_L0, cov_adj_L1, cov_adj_L2, 
                   cov_subpopulation, cov_exp_temporality, cov_exp_definition, cov_aggregate_outcome, `Total cases`, `Total controls`,`Exposed cases`, `Unexposed cases`, `Exposed controls`, `Unexposed controls`,
                   acause, study_design, age_start, age_end, age_mean, age_sd, risk_def, smoking_status, percent_male, outcome_def, exp_temp, unexp_temp, study_label, sample_size, exp_definition_free,
-                  cv_age, cv_sex, cv_income, cv_smoking, cv_alcohol, cv_religion, cv_geography, cv_other, cv_other_smokeless_tob, cv_occupation, cv_oral_hygiene, cv_race, cv_time, cv_urban, cv_nontob_chewing, cv_diet, cv_genotype, cv_ses, cv_medical_history, cv_language, cv_shs)
+                  cv_age, cv_sex, cv_income, cv_smoking, cv_alcohol, cv_religion, cv_geography, cv_other, cv_other_smokeless_tob, cv_occupation, cv_oral_hygiene, cv_race, cv_time, cv_urban, cv_nontob_chewing, cv_diet, cv_genotype, cv_ses, cv_medical_history, cv_language, cv_shs, observation_count)
 }
 
 paste("Saving file now!")
@@ -269,7 +276,7 @@ for(i in unique(male_modelset$acause)){
   relevant_cols <- names(colSums(subset[, ..all_cvs])[which(colSums(subset[, ..all_cvs]) <= 1 | colSums(subset[, ..all_cvs]) >= nrow(subset) - 1)])
   subset <- subset %>% select(!all_of(relevant_cols))
   
-  fwrite(subset, paste0(data_fp, "filename-", i, ".csv"))
+  fwrite(subset, paste0(data_fp, "smoking_smokeless-", i, ".csv"))
 }
 paste("Saving file now!")
 for(i in unique(female_modelset$acause)){
@@ -280,7 +287,7 @@ for(i in unique(female_modelset$acause)){
   relevant_cols <- names(colSums(subset[, ..all_cvs])[which(colSums(subset[, ..all_cvs]) <= 1 | colSums(subset[, ..all_cvs]) >= nrow(subset) - 1)])
   subset <- subset %>% select(!all_of(relevant_cols))
   
-  fwrite(subset, paste0(data_fp, "filename-", i, ".csv"))
+  fwrite(subset, paste0(data_fp, "smoking_smokeless-", i, ".csv"))
 }
 
 

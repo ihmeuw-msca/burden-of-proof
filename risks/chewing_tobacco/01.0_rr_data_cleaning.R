@@ -1,6 +1,8 @@
 ## HEADER #################################################################
+# Date: 5/3/2022
 # Purpose: Cleaning RR Data
 #          
+# source("filepath", echo=T)
 
 ## SET-UP #################################################################
 # Clear memory
@@ -21,9 +23,9 @@ for(p in packages){
 
 # Load files and source code =========================================================================
 extraction_fp <- paste0("filepath")
-file_names <- c("ihd_filename", "stroke_filename", "hnc_filename")
+file_names <- c("chewing_ihd_data.csv", "chewing_stroke_data.csv", "chewing_hnc_raw_data.csv")
 core_fp <- paste0("filepath")
-map_fp <- paste0(core_fp, "filepath/")
+map_fp <- paste0(core_fp, "reference_files/")
 output_fp <- paste0("filepath")
 
 ## SCRIPT ##################################################################
@@ -102,19 +104,19 @@ by_review <- unique(by_review[, .(review, `NID count`, `ES count`)])
 by_review$`Total NIDs`<- length(unique(data$NID))
 if(F){
   View(by_review)
-  fwrite(by_review, paste0(extraction_fp, "filename", date, ".csv"))
+  fwrite(by_review, paste0(extraction_fp, "review_summary_", date, ".csv"))
 }
 
 ## Now lets clean up the exposure and outcome definitions
 exposures <- unique(data[, .(NID, `Exposed group definition`, `Exposure temporality`, `Unexposed group definition`, 
                       `Temporality of unexposed group`, `Risk mapping`, `Study-level risk definition`)])
-exposures_mapped <- fread(paste0(map_fp, "filename.csv"))
+exposures_mapped <- fread(paste0(map_fp, "exposures_mapped.csv"))
 exposures[, NID := as.integer(NID)]
 exposures_mapped[exposures_mapped == ""] <- NA
 exposures[exposures == ""] <- NA
 exp_to_map <- merge(exposures, exposures_mapped, all = T)[is.na(`Effect risk mapping`) | `Effect risk mapping` == ""]
 if(nrow(exp_to_map) > 0){
-  fwrite(exp_to_map, paste0(map_fp, "filename.csv"))
+  fwrite(exp_to_map, paste0(map_fp, "exposures_to_map.csv"))
   stop("You have some exposures that need mapping!")
 } else {
   print("Yay! All of your exposures are mapped. Continue.")
@@ -132,8 +134,8 @@ if(nrow(data[(is.na(`Effect risk mapping`) | `Effect risk mapping` == "")]) > 0)
 setDT(data)
 outcomes <- unique(data[, .(NID, `Study-level Outcome`, `Study-level outcome definition`, `ICD codes (if available)`, 
                             `Outcome`, `Outcome definition`, `ICD-10 codes`)])
-outcomes_mapped <- fread(paste0(map_fp, "filename.csv"))
-acause_mapped <- fread(paste0(map_fp, "filename.csv"))
+outcomes_mapped <- fread(paste0(map_fp, "outcomes_mapped.csv"))
+acause_mapped <- fread(paste0(map_fp, "gbd_acause_map.csv"))
 outcomes_mapped[outcomes_mapped == ""] <- NA
 outcomes_mapped$cause_id <- NULL
 outcomes_mapped$cause <- NULL
@@ -149,7 +151,7 @@ if(nrow(outcomes_mapped[is.na(acause)]) > 0){
   outcomes_mapped[is.na(acause), acause := temp]
   outcomes_mapped[is.na(acause)|acause == "" & NID == 512094, acause := "neo_nasal"]
   outcomes_mapped$temp <- NULL
-  fwrite(outcomes_mapped, paste0(map_fp, "filename.csv"))
+  fwrite(outcomes_mapped, paste0(map_fp, "outcomes_mapped.csv"))
 } 
 
 outcomes[, NID := as.integer(NID)]
@@ -157,7 +159,7 @@ outcomes_mapped[outcomes_mapped == ""] <- NA
 outcomes[outcomes == ""] <- NA
 outcomes_to_map <- merge(outcomes, outcomes_mapped, all = T)[is.na(acause)| acause == ""]
 if(nrow(outcomes_to_map) > 0){
-  fwrite(outcomes_to_map, paste0(map_fp, "filename.csv"))
+  fwrite(outcomes_to_map, paste0(map_fp, "outcomes_to_map.csv"))
   stop("You have some outcomes that need mapping!")
 } else {
   print("Yay! All of your outcomes are mapped. Continue.")
@@ -178,7 +180,7 @@ if("If this effect size is for a subgroup of the study sample, what is the subgr
   covariates <- unique(data[, .(NID, `Confounders controlled for`, `Smoking status`, `Percentage male`)])
   covariates$`If this effect size is for a subgroup of the study sample, what is the subgroup?` <- NA
 }
-covariates_mapped <- fread(paste0(map_fp, "filename.csv"))
+covariates_mapped <- fread(paste0(map_fp, "covariates_mapped.csv"))
 
 covariates[, row_marker := 1:.N]
 covariates[, `:=` (standard_covariates = str_split_fixed(`Confounders controlled for`, "Other: ", 2)[1], 
@@ -187,7 +189,7 @@ covariates$row_marker <- NULL
 covariates <- merge(covariates, covariates_mapped, all.x = T)
 covariates[covariates == ""] <- NA
 if(nrow(covariates[!is.na(`Other covariates`) & is.na(`Covs mapped to`)]) > 0){
-  fwrite(covariates[!is.na(`Other covariates`) & is.na(`Covs mapped to`)], paste0(map_fp, "filename.csv"))
+  fwrite(covariates[!is.na(`Other covariates`) & is.na(`Covs mapped to`)], paste0(map_fp, "covariates_to_map.csv"))
   stop("You have some covariates that need mapping!")
 } else {
   print("Yay! All of your covariates are mapped. Continue.")
@@ -208,7 +210,7 @@ if(nrow(data[(is.na(Confounders) | Confounders == "") & (!is.na(`Confounders con
 }
 
 if(F){
-  fwrite(data, paste0(extraction_fp, "filename_", date, ".csv"))
+  fwrite(data, paste0(extraction_fp, "wide_cleaned_data_", date, ".csv"))
 } 
 
 ## check if things have been marked for controlled for sex
@@ -283,9 +285,9 @@ modelset[is.na(standard_error) & `CI type` == "95", `:=` (se_calc = "uses confid
 modelset[is.na(standard_error) & `CI type` == "90", `:=` (se_calc = "uses confidence interval")]
 modelset[is.na(standard_error) & `CI type` == "99", `:=` (se_calc = "uses confidence interval")]
 
-print(paste0("Imputing standard errors for ", nrow(modelset[is.na(standard_error) & is.na(se_calc)]), " rows of data."))
+print(paste0("Imputing standard errors for ", nrow(modelset[is.na(se_calc)]), " rows of data."))
 
-modelset[is.na(standard_error) & is.na(se_calc), `:=` (se_calc = "uses 98th percentile of observed standard errors")]
+modelset[is.na(se_calc), `:=` (se_calc = "uses 98th percentile of observed standard errors")]
 
 if(nrow(modelset[is.na(se_calc)]) > 0){
   stop("You have some standard error flags that are still missing!")
@@ -298,5 +300,5 @@ setnames(modelset, c("Were the study participants geographically representative 
          c("rep_geography", "rep_participants", "rep_prev_disease", "subgroup"))
 
 print("Saving data file now!")
-fwrite(modelset, paste0(output_fp, "filename_", date, ".csv"))
+fwrite(modelset, paste0(output_fp, "prepped_", date, ".csv"))
 
