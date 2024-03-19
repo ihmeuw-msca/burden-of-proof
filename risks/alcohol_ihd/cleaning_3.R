@@ -1,5 +1,5 @@
 ##########################################################################################
-# Title: Alcohol consumption and ischemic heart disease: a Burden of Proof study
+# Title: A burden of proof study on alcohol consumption and ischemic heart disease
 # Purpose: Cleaning data (part III)
 ##########################################################################################
 
