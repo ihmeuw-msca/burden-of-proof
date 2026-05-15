@@ -98,7 +98,7 @@ dt[, `:=`(
   effect_size_unit     = "linear",
   source_type          = "Survey - longitudinal",
   standard_error       = "NA",
-  rei                  = "diet_ssb"
+  rei                  = "UPF"
 )]
 
 # Harmonize string names
@@ -142,12 +142,4 @@ if(!is.null(overlap_to_drop)) dt_final2[, (overlap_to_drop) := NULL]
 # Final specific drops
 dt_final2[, c("cov_diabetes", "cov_selection_bias", "cov_mortality_only") := NULL]
 
-# --- 7. Save Output ---
-bias_covs <- grep("^cov_", names(dt_final2), value = TRUE)
-req_columns <- c("nid", "seq", "measure", "ln_rr", "ln_rr_se", "ref_risk_lower", "ref_risk_upper", 
-                 "alt_risk_lower", "alt_risk_upper", "location_id", "risk_type", "risk_unit")
-
-dt_final3 <- dt_final2[, c(bias_covs, req_columns), with = FALSE]
-dt_final3[, `:=`(risk = "UPF", study_id = nid)]
-
-fwrite(dt_final3, paste0(save_d, folder, "/trimmed/", subfolder, "UPF", "-", acause, ".csv"))
+fwrite(dt_final2, paste0(save_d, folder, subfolder, "UPF", "-", acause, ".csv"))
