@@ -78,12 +78,6 @@ dt <- dt[!is.na(ln_rr)]
 names(dt) <- gsub("^(cofounder_+|confounder_+|confounders_+|cov_+)", "cov_", names(dt))
 names(dt) <- gsub("^(cofounder|confounder|confounders|cov)_*", "cov_", names(dt))
 
-# Remove non-relevant bias covariates
-drop_covs <- c("cov_other_dietary_components", "cov_other", "cov_subpopulation", "cov_mixed_intervention", 
-               "cov_confounding_uncontrolled", "cov_outcome_unblinded", "cov_exposure_population", 
-               "cov_confounding_nonrandom", "cov_exp_measurement", "cov_exposure_study", "cov_outcome_assessment_method")
-dt[, (drop_covs) := NULL]
-
 
 # --- 5. Final Formatting for Upload ---
 dt[, measure := "relrisk"]
@@ -140,6 +134,5 @@ overlap_to_drop <- find_identical_columns_unique(dt_final2[, ..bias_covs])
 if(!is.null(overlap_to_drop)) dt_final2[, (overlap_to_drop) := NULL]
 
 # Final specific drops
-dt_final2[, c("cov_diabetes", "cov_selection_bias", "cov_mortality_only") := NULL]
 
 fwrite(dt_final2, paste0(save_d, folder, subfolder, "UPF", "-", acause, ".csv"))
